@@ -40,7 +40,7 @@ vulnsentinel-v2/
 ### 1. Cloner le projet
 
 ```bash
-git clone <repo-url>
+git clone git@github.com:ABDONOKRA/Misuse-API-Detector.git
 cd vulnsentinel-v2
 ```
 
