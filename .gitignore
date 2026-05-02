@@ -1,20 +1,75 @@
-# Environments
-env/
-venv/
-source/
-.env
+# ========================
+# Android / Gradle
+# ========================
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
 
-# Python Caches & Bytecode
+# Android Studio generated
+app/build/
+app/release/
+
+# Keystore (ne jamais committer)
+*.jks
+*.keystore
+
+# ========================
+# Python
+# ========================
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
+*.pyo
+.env
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+.eggs/
 
-# Logs
+# ========================
+# Logs & données
+# ========================
+logs/*.log
+logs/*.csv
+benchmark/*.csv
+benchmark/*.json
 *.log
 
-# IDE & OS Specific
-.vscode/
-.idea/
+# ========================
+# Streamlit
+# ========================
+.streamlit/secrets.toml
+
+# ========================
+# mitmproxy
+# ========================
+*.mitm
+*.flow
+
+# ========================
+# OS
+# ========================
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================
+# IDE
+# ========================
 *.swp
+*.swo
+.vscode/
+*.sublime-project
+*.sublime-workspace
