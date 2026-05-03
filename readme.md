@@ -1,6 +1,6 @@
 # 🔐 Mobile API Misuse Detector — V2
 
-Détection d'abus d'API mobile en temps réel via un émulateur Android, mitmproxy, Nginx et un dashboard Streamlit.
+Détection d'abus d'API mobile en temps réel via une app Android, mitmproxy, Nginx et un dashboard Streamlit avec IA (K-Means + Isolation Forest).
 
 ---
 
@@ -8,17 +8,23 @@ Détection d'abus d'API mobile en temps réel via un émulateur Android, mitmpro
 
 ```
 vulnsentinel-v2/
+├── ai/
+│   ├── feature_extractor.py    # Extraction des features par IP
+│   ├── kmeans_clustering.py    # Clustering K-Means
+│   ├── isolation_forest.py     # Détection d'anomalies
+│   └── ai_engine.py            # Moteur IA combiné
 ├── app/                        # App Android (Kotlin) — génère le trafic
 ├── mitm_addons/
 │   └── nginx_logger.py         # Addon mitmproxy → écrit dans access.log
 ├── dashboard/
 │   └── streamlit_app.py        # Dashboard temps réel
-├── log_watcher.py              # Détection brute force / spike / enum
-├── benchmark/                  # Scripts de benchmark Faker vs réel
+├── benchmark/
+│   └── benchmark.py            # Benchmark Fail2ban vs Notre Système
 ├── generator/                  # Générateur de logs simulés (Faker)
 ├── detection/                  # Moteur de détection (K-Means)
 ├── parser/                     # Parser de logs Nginx
 ├── logs/                       # Logs générés
+├── log_watcher.py              # Détection brute force / spike / enum
 └── requirements.txt            # Dépendances Python
 ```
 
@@ -32,6 +38,7 @@ vulnsentinel-v2/
 - mitmproxy
 - Nginx
 - ADB (Android Debug Bridge)
+- Fail2ban
 
 ---
 
@@ -60,17 +67,20 @@ sudo systemctl status nginx
 ```
 
 Vérifie que Nginx répond :
+
 ```bash
 curl http://localhost/api/v1/products
 # → {"status":"ok"}
 ```
 
-### 4. Lancer l'émulateur Android
+### 4. Lancer l'émulateur Android (optionnel)
 
 ```bash
 cd ~/Android/Sdk/emulator
 ./emulator -avd Pixel_6 -writable-system
 ```
+
+> ℹ️ Si tu utilises un téléphone réel, passe directement à l'étape suivante.
 
 ### 5. Configurer le certificat mitmproxy (première fois seulement)
 
@@ -108,7 +118,20 @@ Ouvre le navigateur sur : **http://localhost:8501**
 
 ### 9. Lancer l'app Android
 
-Dans Android Studio, lance l'app sur l'émulateur Pixel 6.  
+#### Option A — Émulateur
+
+Dans Android Studio, lance l'app sur l'émulateur Pixel 6.
+
+#### Option B — Téléphone réel (recommandé)
+
+1. Dans `app/src/main/java/.../MainActivity.kt`, remplace l'URL :
+   ```kotlin
+   private val BASE_URL = "http://<IP_DE_TA_MACHINE>/api/v1"
+   ```
+2. Dans Android Studio : **Build → Build APK(s)**
+3. Transfère l'APK sur ton téléphone et installe-le
+4. Assure-toi que le téléphone est sur le **même réseau WiFi** que ta machine
+
 Clique sur les boutons pour générer du trafic :
 
 | Bouton | Description |
@@ -117,6 +140,64 @@ Clique sur les boutons pour générer du trafic :
 | **Brute Force Login** | 30 tentatives POST /login |
 | **Spike de Requêtes** | 50 requêtes rapides |
 | **Énumération** | 6 endpoints différents |
+
+---
+
+## 📱 App Android — Demo
+
+L'application Android est le générateur de trafic du projet. Elle simule différents types d'abus API directement depuis un appareil mobile réel ou un émulateur.
+
+https://github.com/user-attachments/assets/9eee94b7-9863-4597-8c83-aefe64e35506
+
+### Fonctionnalités
+
+| Bouton | Type d'abus simulé | Requêtes envoyées |
+|--------|-------------------|-------------------|
+| **Trafic Normal** | Navigation légitime | 20 GET vers `/products` et `/user/profile` |
+| **Brute Force Login** | Attaque par force brute | 30 POST vers `/login` |
+| **Spike de Requêtes** | Déni de service applicatif | 50 GET rapides vers `/products` |
+| **Énumération** | Découverte d'endpoints | GET vers `/admin`, `/config`, `/backup`, `/user/1-3` |
+
+### Déploiement sur téléphone réel
+
+```
+Android Studio → Build → Build APK(s)
+         ↓
+   app/build/outputs/apk/debug/app-debug.apk
+         ↓
+   Partage via USB / AirDrop / Google Drive
+         ↓
+   Installer sur le téléphone (activer sources inconnues)
+```
+
+### Configuration réseau
+
+L'app pointe vers l'IP de la machine hôte. Modifie dans `MainActivity.kt` :
+
+```kotlin
+private val BASE_URL = "http://192.168.x.x/api/v1"
+```
+
+> ⚠️ Le téléphone et la machine doivent être sur le même réseau WiFi.
+
+### Logs générés
+
+Chaque requête de l'app apparaît dans `/var/log/nginx/access.log` avec l'IP réelle du téléphone, permettant au moteur IA de l'analyser.
+
+---
+
+## 🤖 Moteur IA
+
+Le moteur combine deux algorithmes :
+
+| Algorithme | Rôle |
+|-----------|------|
+| **K-Means** | Clustering comportemental des IPs (Normal / Suspect / Attaquant) |
+| **Isolation Forest** | Détection d'anomalies sans seuils hardcodés |
+
+```bash
+sudo python ai/ai_engine.py
+```
 
 ---
 
@@ -130,13 +211,21 @@ Clique sur les boutons pour générer du trafic :
 
 ---
 
-## 📊 Benchmark
+## 📊 Benchmark — Fail2ban vs Notre Système
 
 ```bash
-python benchmark/run_benchmark.py
+sudo python benchmark/benchmark.py
 ```
 
-Compare les métriques (Precision / Recall / F1) entre logs simulés (Faker) et logs réels (émulateur).
+### Résultats obtenus
+
+| Métrique | Fail2ban | **Notre Système** |
+|----------|----------|---------------|
+| Precision | 1.000 | **1.000** |
+| Recall | 0.333 | **0.833** |
+| F1-Score | 0.500 | **0.909** |
+
+> Notre système est **82% meilleur** en F1-Score grâce à la détection des attaques localhost et des patterns comportementaux complexes.
 
 ---
 
@@ -148,11 +237,14 @@ adb shell settings delete global http_proxy
 
 # Arrêter Nginx
 sudo systemctl stop nginx
+
+# Arrêter Fail2ban
+sudo systemctl stop fail2ban
 ```
 
 ---
 
-## 👤 Auteur
+## 👤 Auteurs
 
 **Ennoukra Abdelghafour** — Sécurité Mobile V2
 **Salihi Yassine** — Sécurité Mobile V2
